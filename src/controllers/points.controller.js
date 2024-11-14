@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 @Controller('points')
@@ -26,14 +26,41 @@ export class PointsController {
   async addPoints(body) {
     console.log('Adding points to user');
     const { userId, points } = body;
-    return this.prisma.points.create({
-      data: {
-        userId,
-        points,
-      },
-    });
+    if (!userId || !points) {
+      throw new BadRequestException('Invalid user ID or points');
+    }
+    try {
+      return await this.prisma.points.create({
+        data: {
+          userId,
+          points,
+        },
+      });
+    } catch (error) {
+      console.error('Error adding points to user', error);
+      throw new BadRequestException('Invalid user ID or points');
+    }
+  }
+
+  /**
+   * Retrieves points for a specific user.
+   * @param userId - The ID of the user to retrieve points for.
+   * @returns The points record for the specified user.
+   */
+  @Get(':userId')
+  async getPointsForUser(userId) {
+    console.log(`Fetching points for user with ID: ${userId}`);
+    try {
+      return await this.prisma.points.findMany({
+        where: { userId },
+      });
+    } catch (error) {
+      console.error(`Error fetching points for user with ID: ${userId}`, error);
+      throw new BadRequestException('Invalid user ID');
+    }
   }
 }
 
 export const getPoints = PointsController.prototype.getPoints;
 export const addPoints = PointsController.prototype.addPoints;
+export const getPointsForUser = PointsController.prototype.getPointsForUser;

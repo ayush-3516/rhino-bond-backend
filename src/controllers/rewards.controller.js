@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 @Controller('rewards')
@@ -26,15 +26,42 @@ export class RewardsController {
   async addReward(body) {
     console.log('Adding new reward');
     const { name, description, pointsRequired } = body;
-    return this.prisma.reward.create({
-      data: {
-        name,
-        description,
-        pointsRequired,
-      },
-    });
+    if (!name || !description || !pointsRequired) {
+      throw new BadRequestException('Invalid reward details');
+    }
+    try {
+      return await this.prisma.reward.create({
+        data: {
+          name,
+          description,
+          pointsRequired,
+        },
+      });
+    } catch (error) {
+      console.error('Error adding new reward', error);
+      throw new BadRequestException('Invalid reward details');
+    }
+  }
+
+  /**
+   * Retrieves a specific reward by ID.
+   * @param id - The ID of the reward to retrieve.
+   * @returns The reward object.
+   */
+  @Get(':id')
+  async getRewardById(id) {
+    console.log(`Fetching reward with ID: ${id}`);
+    try {
+      return await this.prisma.reward.findUnique({
+        where: { id: parseInt(id) },
+      });
+    } catch (error) {
+      console.error(`Error fetching reward with ID: ${id}`, error);
+      throw new BadRequestException('Invalid reward ID');
+    }
   }
 }
 
 export const getRewards = RewardsController.prototype.getRewards;
 export const addReward = RewardsController.prototype.addReward;
+export const getRewardById = RewardsController.prototype.getRewardById;
