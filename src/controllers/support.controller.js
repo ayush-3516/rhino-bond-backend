@@ -1,67 +1,57 @@
-import { Controller, Get, Post, Param, Body, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { SupportService } from '../services/support.service';
+import { CreateTicketDto, UpdateTicketStatusDto, RespondToTicketDto } from '../dtos/support.dto';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AdminGuard } from '../guards/admin.guard';
 
 @Controller('support')
+@UseGuards(JwtAuthGuard)
 export class SupportController {
-  constructor(prisma) {
-    this.prisma = prisma;
+  constructor(private readonly supportService: SupportService) {}
+
+  @Post('tickets')
+  async createTicket(@Request() req, @Body() createTicketDto: CreateTicketDto) {
+    return this.supportService.createTicket(req.user.id, createTicketDto);
   }
 
-  /**
-   * Retrieves all support tickets.
-   * @returns A list of all support tickets.
-   */
-  @Get()
-  async getSupportTickets() {
-    console.log('Fetching all support tickets');
-    return this.prisma.supportTicket.findMany();
+  @Get('tickets')
+  async getUserTickets(@Request() req) {
+    return this.supportService.getUserTickets(req.user.id);
   }
 
-  /**
-   * Creates a new support ticket.
-   * @param body - The support ticket information to create.
-   * @returns The newly created support ticket object.
-   */
-  @Post()
-  async createSupportTicket(body) {
-    console.log('Creating new support ticket');
-    const { userId, subject, message } = body;
-    if (!userId || !subject || !message) {
-      throw new BadRequestException('Invalid support ticket details');
-    }
-    try {
-      return await this.prisma.supportTicket.create({
-        data: {
-          userId,
-          subject,
-          message,
-        },
-      });
-    } catch (error) {
-      console.error('Error creating new support ticket', error);
-      throw new BadRequestException('Invalid support ticket details');
-    }
+  @Get('tickets/:id')
+  async getTicket(@Request() req, @Param('id') id: string) {
+    return this.supportService.getTicket(id, req.user.id);
   }
 
-  /**
-   * Retrieves support tickets for a specific user.
-   * @param userId - The ID of the user to retrieve support tickets for.
-   * @returns A list of support tickets for the specified user.
-   */
-  @Get(':userId')
-  async getSupportTicketsForUser(userId) {
-    console.log(`Fetching support tickets for user with ID: ${userId}`);
-    try {
-      return await this.prisma.supportTicket.findMany({
-        where: { userId },
-      });
-    } catch (error) {
-      console.error(`Error fetching support tickets for user with ID: ${userId}`, error);
-      throw new BadRequestException('Invalid user ID');
+  @Put('tickets/:id/status')
+  async updateTicketStatus(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() updateTicketStatusDto: UpdateTicketStatusDto
+  ) {
+    return this.supportService.updateTicketStatus(id, req.user.id, updateTicketStatusDto.status);
+  }
+
+  @UseGuards(AdminGuard)
+  @Get('admin/tickets')
+  async getAllTickets() {
+    return this.supportService.getAllTickets();
+  }
+
+  @Post('tickets/:id/respond')
+  async respondToTicket(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() respondToTicketDto: RespondToTicketDto
+  ) {
+    const isStaff = respondToTicketDto.responseType === 'staff';
+    if (isStaff) {
+      // Only admins can respond as staff
+      await this.adminGuard.canActivate(req);
     }
+    return this.supportService.respondToTicket(id, respondToTicketDto.message, isStaff);
   }
 }
 
-export const getSupportTickets = SupportController.prototype.getSupportTickets;
-export const createSupportTicket = SupportController.prototype.createSupportTicket;
-export const getSupportTicketsForUser = SupportController.prototype.getSupportTicketsForUser;
+export const SupportController = SupportController;

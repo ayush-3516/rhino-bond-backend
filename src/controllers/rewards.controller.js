@@ -1,67 +1,52 @@
-import { Controller, Get, Post, Param, Body, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { RewardsService } from '../services/rewards.service';
+import { CreateRewardDto, UpdateRewardDto, ClaimRewardDto } from '../dtos/rewards.dto';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AdminGuard } from '../guards/admin.guard';
 
 @Controller('rewards')
 export class RewardsController {
-  constructor(prisma) {
-    this.prisma = prisma;
-  }
+  constructor(private rewardsService: RewardsService) {}
 
-  /**
-   * Retrieves all rewards.
-   * @returns A list of all rewards.
-   */
   @Get()
-  async getRewards() {
-    console.log('Fetching all rewards');
-    return this.prisma.reward.findMany();
+  async getAllRewards() {
+    return this.rewardsService.getAllRewards();
   }
 
-  /**
-   * Adds a new reward.
-   * @param body - The reward information to add.
-   * @returns The newly created reward object.
-   */
-  @Post()
-  async addReward(body) {
-    console.log('Adding new reward');
-    const { name, description, pointsRequired } = body;
-    if (!name || !description || !pointsRequired) {
-      throw new BadRequestException('Invalid reward details');
-    }
-    try {
-      return await this.prisma.reward.create({
-        data: {
-          name,
-          description,
-          pointsRequired,
-        },
-      });
-    } catch (error) {
-      console.error('Error adding new reward', error);
-      throw new BadRequestException('Invalid reward details');
-    }
+  @UseGuards(JwtAuthGuard)
+  @Get('available')
+  async getAvailableRewards(@Request() req) {
+    return this.rewardsService.getAvailableRewards(req.user.id);
   }
 
-  /**
-   * Retrieves a specific reward by ID.
-   * @param id - The ID of the reward to retrieve.
-   * @returns The reward object.
-   */
   @Get(':id')
-  async getRewardById(id) {
-    console.log(`Fetching reward with ID: ${id}`);
-    try {
-      return await this.prisma.reward.findUnique({
-        where: { id: parseInt(id) },
-      });
-    } catch (error) {
-      console.error(`Error fetching reward with ID: ${id}`, error);
-      throw new BadRequestException('Invalid reward ID');
-    }
+  async getReward(@Param('id') id) {
+    return this.rewardsService.getReward(id);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Post()
+  async createReward(@Body() createRewardDto: CreateRewardDto) {
+    return this.rewardsService.createReward(createRewardDto);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Put(':id')
+  async updateReward(@Param('id') id, @Body() updateRewardDto: UpdateRewardDto) {
+    return this.rewardsService.updateReward(id, updateRewardDto);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Delete(':id')
+  async deleteReward(@Param('id') id) {
+    return this.rewardsService.deleteReward(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('claim')
+  async claimReward(@Request() req, @Body() claimRewardDto: ClaimRewardDto) {
+    return this.rewardsService.claimReward(req.user.id, claimRewardDto.rewardId);
   }
 }
 
-export const getRewards = RewardsController.prototype.getRewards;
-export const addReward = RewardsController.prototype.addReward;
-export const getRewardById = RewardsController.prototype.getRewardById;
+export const RewardsController = RewardsController;

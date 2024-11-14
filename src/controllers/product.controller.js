@@ -1,67 +1,70 @@
-import { Controller, Get, Post, Param, Body, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ProductService } from '../services/product.service';
+import { CreateProductDto, UpdateProductDto, SearchProductDto } from '../dtos/product.dto';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AdminGuard } from '../guards/admin.guard';
 
 @Controller('products')
+@UseGuards(JwtAuthGuard)
 export class ProductController {
-  constructor(prisma) {
-    this.prisma = prisma;
-  }
+  constructor(private productService: ProductService) {}
 
-  /**
-   * Retrieves all products.
-   * @returns A list of all products.
-   */
   @Get()
-  async getProducts() {
-    console.log('Fetching all products');
-    return this.prisma.product.findMany();
+  async getAllProducts(@Query() searchProductDto: SearchProductDto) {
+    return this.productService.getAllProducts(searchProductDto);
   }
 
-  /**
-   * Adds a new product.
-   * @param body - The product information to add.
-   * @returns The newly created product object.
-   */
-  @Post()
-  async addProduct(body) {
-    console.log('Adding new product');
-    const { name, description, price } = body;
-    if (!name || !description || !price) {
-      throw new BadRequestException('Invalid product details');
-    }
-    try {
-      return await this.prisma.product.create({
-        data: {
-          name,
-          description,
-          price,
-        },
-      });
-    } catch (error) {
-      console.error('Error adding new product', error);
-      throw new BadRequestException('Invalid product details');
-    }
-  }
-
-  /**
-   * Retrieves a specific product by ID.
-   * @param id - The ID of the product to retrieve.
-   * @returns The product object.
-   */
   @Get(':id')
-  async getProductById(id) {
-    console.log(`Fetching product with ID: ${id}`);
-    try {
-      return await this.prisma.product.findUnique({
-        where: { id: parseInt(id) },
-      });
-    } catch (error) {
-      console.error(`Error fetching product with ID: ${id}`, error);
-      throw new BadRequestException('Invalid product ID');
-    }
+  async getProduct(@Param('id') id: number) {
+    return this.productService.getProduct(id);
+  }
+
+  @UseGuards(AdminGuard)
+  @Post()
+  async createProduct(@Body() createProductDto: CreateProductDto) {
+    return this.productService.createProduct(createProductDto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Put(':id')
+  async updateProduct(@Param('id') id: number, @Body() updateProductDto: UpdateProductDto) {
+    return this.productService.updateProduct(id, updateProductDto);
+  }
+
+  @UseGuards(AdminGuard)
+  @Delete(':id')
+  async deleteProduct(@Param('id') id: number) {
+    return this.productService.deleteProduct(id);
+  }
+
+  @Get('category/:category')
+  async getProductsByCategory(@Param('category') category: string) {
+    return this.productService.getProductsByCategory(category);
+  }
+
+  @Get('search')
+  async searchProducts(@Query() searchProductDto: SearchProductDto) {
+    return this.productService.searchProducts(searchProductDto);
+  }
+
+  @Get('featured')
+  async getFeaturedProducts() {
+    return this.productService.getFeaturedProducts();
+  }
+
+  @UseGuards(AdminGuard)
+  @Post(':id/feature')
+  async setProductFeatured(@Param('id') id: number, @Body('featured') featured: boolean) {
+    return this.productService.setProductFeatured(id, featured);
   }
 }
 
-export const getProducts = ProductController.prototype.getProducts;
-export const addProduct = ProductController.prototype.addProduct;
-export const getProductById = ProductController.prototype.getProductById;
+export const getAllProducts = ProductController.prototype.getAllProducts;
+export const getProduct = ProductController.prototype.getProduct;
+export const createProduct = ProductController.prototype.createProduct;
+export const updateProduct = ProductController.prototype.updateProduct;
+export const deleteProduct = ProductController.prototype.deleteProduct;
+export const getProductsByCategory = ProductController.prototype.getProductsByCategory;
+export const searchProducts = ProductController.prototype.searchProducts;
+export const getFeaturedProducts = ProductController.prototype.getFeaturedProducts;
+export const setProductFeatured = ProductController.prototype.setProductFeatured;

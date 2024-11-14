@@ -1,63 +1,50 @@
-import { Controller, Get, Put, Post, Param, Body, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { Controller, Get, Post, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { NotificationService } from '../services/notification.service';
+import { CreateNotificationDto } from '../dtos/notification.dto';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { AdminGuard } from '../guards/admin.guard';
 
 @Controller('notifications')
+@UseGuards(JwtAuthGuard)
 export class NotificationController {
-  constructor(prisma) {
-    this.prisma = prisma;
-  }
+  constructor(private readonly notificationService: NotificationService) {}
 
-  /**
-   * Retrieves all notifications.
-   * @returns A list of all notifications.
-   */
   @Get()
-  async getNotifications() {
-    console.log('Fetching all notifications');
-    return this.prisma.notification.findMany();
+  async getUserNotifications(@Request() req) {
+    return this.notificationService.getUserNotifications(req.user.id);
   }
 
-  /**
-   * Marks a notification as read.
-   * @param id - The ID of the notification to mark as read.
-   * @param body - The body containing the read status.
-   * @returns The updated notification object.
-   */
-  @Put(':id/read')
-  async markAsRead(id, body) {
-    console.log(`Marking notification with ID: ${id} as read`);
-    const { read } = body;
-    try {
-      return await this.prisma.notification.update({
-        where: { id: parseInt(id) },
-        data: { read },
-      });
-    } catch (error) {
-      console.error(`Error marking notification with ID: ${id} as read`, error);
-      throw new BadRequestException('Invalid notification ID or read status');
-    }
+  @Get(':id')
+  async getNotification(@Request() req, @Param('id') id) {
+    return this.notificationService.getNotification(id, req.user.id);
   }
 
-  /**
-   * Creates a new notification.
-   * @param body - The body containing the notification details.
-   * @returns The created notification object.
-   */
+  @UseGuards(AdminGuard)
   @Post()
-  async createNotification(body) {
-    console.log('Creating a new notification');
-    const { title, message } = body;
-    try {
-      return await this.prisma.notification.create({
-        data: { title, message, read: false },
-      });
-    } catch (error) {
-      console.error('Error creating notification', error);
-      throw new BadRequestException('Invalid notification details');
-    }
+  async createNotification(@Body() createNotificationDto: CreateNotificationDto) {
+    return this.notificationService.createNotification(createNotificationDto);
+  }
+
+  @Delete(':id')
+  async deleteNotification(@Request() req, @Param('id') id) {
+    return this.notificationService.deleteNotification(id, req.user.id);
+  }
+
+  @Post(':id/read')
+  async markAsRead(@Request() req, @Param('id') id) {
+    return this.notificationService.markAsRead(id, req.user.id);
+  }
+
+  @UseGuards(AdminGuard)
+  @Post('broadcast')
+  async broadcastNotification(@Body() createNotificationDto: CreateNotificationDto) {
+    return this.notificationService.broadcastNotification(createNotificationDto);
   }
 }
 
-export const getNotifications = NotificationController.prototype.getNotifications;
-export const markAsRead = NotificationController.prototype.markAsRead;
+export const getUserNotifications = NotificationController.prototype.getUserNotifications;
+export const getNotification = NotificationController.prototype.getNotification;
 export const createNotification = NotificationController.prototype.createNotification;
+export const deleteNotification = NotificationController.prototype.deleteNotification;
+export const markAsRead = NotificationController.prototype.markAsRead;
+export const broadcastNotification = NotificationController.prototype.broadcastNotification;
